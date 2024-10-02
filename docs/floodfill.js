@@ -130,9 +130,11 @@ function restart() {
 
 canvas.addEventListener("mousedown", gridClickHandler);
 function gridClickHandler(event) {
-     updatePlayerScore();
+    // eslint-disable-next-line no-unused-vars
+    updatePlayerScore();
     updateGridAt(event.offsetX, event.offsetY);
 }
+
 
 restartButton.addEventListener("mousedown", restartClickHandler);
 function restartClickHandler() {
