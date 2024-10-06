@@ -1,196 +1,154 @@
 "use strict";
 
 (() => {
-window.addEventListener("load", (event) => {
+  window.addEventListener("load", (event) => {
     console.log(event);
-// *****************************************************************************
-// #region Constants and Variables
+    // *****************************************************************************
+    // #region Constants and Variables
 
-// Canvas references
-const canvas = document.querySelector("canvas");
-const ctx = canvas.getContext("2d");
+    // Canvas references
+    const canvas = document.querySelector("canvas");
+    const ctx = canvas.getContext("2d");
 
-// UI references
-const restartButton = document.querySelector("#restart");
-const undoButton = document.querySelector('#undo');
-const rotateButton = document.querySelector('#rotate');
-const colorSelectButtons = document.querySelectorAll(".color-select");
-const playerScoreText = document.querySelector('#score-text'); 
+    // UI references
+    const restartButton = document.querySelector("#restart");
+    const undoButton = document.querySelector("#undo");
 
-// Constants
-const CELL_COLORS = {
-    white: [255, 255, 255],
-    black: [0, 0, 0],
-    red: [255, 0, 0],
-    green: [0, 255, 0], 
-    blue: [0, 0, 255]
-}
-const CELLS_PER_AXIS = 9;
-const CELL_WIDTH = canvas.width/CELLS_PER_AXIS;
-const CELL_HEIGHT = canvas.height/CELLS_PER_AXIS;
-const MAXIMUM_SCORE = CELLS_PER_AXIS * CELLS_PER_AXIS;;
+    // Constants
+    const CELLS_PER_AXIS = 3;
+    const CELL_WIDTH = canvas.width / CELLS_PER_AXIS;
+    const CELL_HEIGHT = canvas.height / CELLS_PER_AXIS;
 
-// Game objects
-let replacementColor = CELL_COLORS.white;
-let grids;
-let playerScore = MAXIMUM_SCORE;
+    // Game objects
+    let grids;
+    let lastMove = null; // To store only the last move
+    let currentPlayer = "X";
+    let gameOver = false;
 
-// #endregion
+    // #endregion
 
+    // *****************************************************************************
+    // #region Game Logic
 
-// *****************************************************************************
-// #region Game Logic
-
-function startGame(startingGrid = []) {
-    if (startingGrid.length === 0) {
-        startingGrid = initializeGrid();
+    function startGame() {
+      grids = initializeGrid();
+      render(grids);
+      gameOver = false;
+      currentPlayer = "X"; // X always starts first
+      lastMove = null; // Clear last move on new game
     }
-    initializeHistory(startingGrid);
-    render(grids[0]);
-}
 
-function initializeGrid() {
-    const newGrid = [];
-    for (let i = 0; i < CELLS_PER_AXIS * CELLS_PER_AXIS; i++) {
-        newGrid.push(chooseRandomPropertyFrom(CELL_COLORS));
+    function initializeGrid() {
+      const newGrid = [];
+      for (let i = 0; i < CELLS_PER_AXIS * CELLS_PER_AXIS; i++) {
+        newGrid.push("");
+      }
+      return newGrid;
     }
-    return newGrid;
-}
 
-function initializeHistory(startingGrid) {
-    grids = [];
-    grids.push(startingGrid);
-}   
+    function render(grid) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas before each render
+      for (let i = 0; i < grid.length; i++) {
+        const col = i % CELLS_PER_AXIS;
+        const row = Math.floor(i / CELLS_PER_AXIS);
+        const xPos = col * CELL_WIDTH;
+        const yPos = row * CELL_HEIGHT;
 
-function rollBackHistory() {
-    if (grids.length > 0) {
-        grids = grids.slice(0, grids.length-1);
-        render(grids[grids.length-1]);
-    }
-}
+        ctx.strokeStyle = "black";
+        ctx.strokeRect(xPos, yPos, CELL_WIDTH, CELL_HEIGHT);
 
-function transposeGrid() {
-    for (let i = 0; i < grids.length; i++) {
-    const currentGrid = grids[i];
-    for (let j = 0; j < currentGrid.length; j++) {
-        const currentGridRow = Math.floor(j / CELLS_PER_AXIS);
-        const currentGridColumn = j % CELLS_PER_AXIS;
-        if (currentGridColumn >= currentGridRow) {
-            const tempCellStorage = currentGrid[j];
-            currentGrid[j] = currentGrid[currentGridColumn * CELLS_PER_AXIS + currentGridRow];
-            currentGrid[currentGridColumn * CELLS_PER_AXIS + currentGridRow] = tempCellStorage;
+        // Draw X or O
+        if (grid[i]) {
+          ctx.font = "48px Arial";
+          ctx.fillText(
+            grid[i],
+            xPos + CELL_WIDTH / 3,
+            yPos + CELL_HEIGHT / 1.5
+          );
         }
+      }
     }
-    grids[i] = currentGrid;
-    }
-    render(grids[grids.length-1]);
-}
 
-function render(grid) {
-    for (let i = 0; i < grid.length; i++) {
-        ctx.fillStyle = rgb(${grid[i][0]}, ${grid[i][0]}, ${grid[i][2]});
-        ctx.fillRect((i % CELLS_PER_AXIS) * CELL_WIDTH, Math.floor(i / CELLS_PER_AXIS) * CELL_HEIGHT, CELL_WIDTH, CELL_HEIGHT);
-    }
-    playerScoreText.textContent = playerScore;
-}
+    function updateGridAt(mouseX, mouseY) {
+      if (gameOver) return; // Prevent moves after the game is over
 
-function updateGridAt(mousePositionX, mousePositionY) {
-    const gridCoordinates = convertCartesiansToGrid(mousePositionX, mousePositionY);
-    const newGrid = grids[grids.length-1].slice(); 
-    floodFill(newGrid, gridCoordinates, newGrid[gridCoordinates.column * CELLS_PER_AXIS + gridCoordinates.row])
-    grids.push(newGrid);
-    render(grids[grids.length-1]);    
-}
+      const gridCoordinates = convertCartesiansToGrid(mouseX, mouseY);
+      const index =
+        gridCoordinates.row * CELLS_PER_AXIS + gridCoordinates.column;
 
-function updatePlayerScore() {
-playerScore = playerScore > 0 ? playerScore -= 1 : 0;
-}
+      if (grids[index] === "") {
+        // Only mark if the cell is empty
+        lastMove = grids.slice(); // Save the current grid state to lastMove
+        grids[index] = currentPlayer;
+        render(grids);
 
-function floodFill(grid, gridCoordinate, colorToChange) { 
-    if (arraysAreEqual(colorToChange, replacementColor)) { return } //The current cell is already the selected color
-    else if (!arraysAreEqual(grid[gridCoordinate.row * CELLS_PER_AXIS + gridCoordinate.column], colorToChange)) { return }  //The current cell is a different color than the initially clicked-on cell
-    else {
-        grid[gridCoordinate.row * CELLS_PER_AXIS + gridCoordinate.column] = replacementColor;
-        floodFill(grid, {column: Math.max(gridCoordinate.column - 1, 0), row: gridCoordinate.row}, colorToChange);
-        floodFill(grid, {column: Math.min(gridCoordinate.column + 1, CELLS_PER_AXIS - 1), row: gridCoordinate.row}, colorToChange);
-        floodFill(grid, {column: gridCoordinate.column, row: Math.max(gridCoordinate.row - 1, 0)}, colorToChange);
-        floodFill(grid, {column: gridCoordinate.column, row: Math.min(gridCoordinate.row + 1, CELLS_PER_AXIS - 1)}, colorToChange);
-    }
-    return
-}
-
-function restart() {
-    startGame(grids[0]);
-}
-
-// #endregion
-
-
-// *****************************************************************************
-// #region Event Listeners
-
-canvas.addEventListener("mousedown", gridClickHandler);
-function gridClickHandler(event) {
-     updatePlayerScore();
-    updateGridAt(event.offsetX, event.offsetY);
-}
-
-restartButton.addEventListener("mousedown", restartClickHandler);
-function restartClickHandler() {
-    restart();
-}
-
-undoButton.addEventListener("mousedown", undoLastMove);
-function undoLastMove() {
-    rollBackHistory();
-}
-
-rotateButton.addEventListener("mousedown", rotateGrid);
-function rotateGrid() {
-    transposeGrid();
-}
-
-colorSelectButtons.forEach(button => {
-    button.addEventListener("mousedown", () => replacementColor = CELL_COLORS[button.name])
-});
-
-// #endregion
-
-
-// *****************************************************************************
-// #region Helper Functions
-
-// To convert canvas coordinates to grid coordinates
-function convertCartesiansToGrid(xPos, yPos) {
-    return {
-        column: Math.floor(xPos/CELL_WIDTH),
-        row: Math.floor(yPos/CELL_HEIGHT)
-    };
-}
-
-// To choose a random property from a given object
-function chooseRandomPropertyFrom(object) {
-    const keys = Object.keys(object);
-    return object[keys[ Math.floor(keys.length * Math.random()) ]]; //Truncates to integer
-};
-
-// To compare two arrays
-function arraysAreEqual(arr1, arr2) {
-    if (arr1.length != arr2.length) { return false }
-    else {
-        for (let i = 0; i < arr1.length; i++) {
-            if (arr1[i] != arr2[i]) {
-                return false;
-            }
+        if (checkWinCondition()) {
+          alert(`${currentPlayer} wins!`);
+          gameOver = true;
+        } else if (grids.every((cell) => cell !== "")) {
+          alert("It's a tie!");
+          gameOver = true;
+        } else {
+          currentPlayer = currentPlayer === "X" ? "O" : "X"; // Switch player
         }
-        return true;
+      }
     }
-}
 
-// #endregion
+    function checkWinCondition() {
+      const winPatterns = [
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8], // Rows
+        [0, 3, 6],
+        [1, 4, 7],
+        [2, 5, 8], // Columns
+        [0, 4, 8],
+        [2, 4, 6], // Diagonals
+      ];
 
-//Start game
-startGame();
+      return winPatterns.some((pattern) => {
+        return (
+          grids[pattern[0]] !== "" &&
+          grids[pattern[0]] === grids[pattern[1]] &&
+          grids[pattern[1]] === grids[pattern[2]]
+        );
+      });
+    }
 
-});
-})(); 
+    function convertCartesiansToGrid(xPos, yPos) {
+      return {
+        column: Math.floor(xPos / CELL_WIDTH),
+        row: Math.floor(yPos / CELL_HEIGHT),
+      };
+    }
+
+    function restart() {
+      startGame();
+    }
+
+    function undoLastMove() {
+      if (lastMove) {
+        grids = lastMove.slice(); // Restore the last move
+        lastMove = null; // Clear last move, so undo can only happen once
+        currentPlayer = currentPlayer === "X" ? "O" : "X"; // Switch back to the previous player
+        render(grids); // Re-render the grid with the previous state
+        gameOver = false; // Allow the game to continue after undo
+      }
+    }
+
+    // #region Event Listeners
+
+    canvas.addEventListener("mousedown", (event) => {
+      updateGridAt(event.offsetX, event.offsetY);
+    });
+
+    restartButton.addEventListener("mousedown", restart);
+
+    undoButton.addEventListener("mousedown", undoLastMove);
+
+    // #endregion
+
+    // Start game
+    startGame();
+  });
+})();
