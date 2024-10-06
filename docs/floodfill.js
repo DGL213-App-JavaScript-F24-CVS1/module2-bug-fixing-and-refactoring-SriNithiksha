@@ -63,7 +63,7 @@ function initializeHistory(startingGrid) {
 }   
 
 function rollBackHistory() {
-    if (grids.length > 0) {
+    if (grids.length > 1) {
         grids = grids.slice(0, grids.length-1);
         render(grids[grids.length-1]);
     }
