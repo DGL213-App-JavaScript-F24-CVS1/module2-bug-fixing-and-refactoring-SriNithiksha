@@ -2,6 +2,7 @@
 
 (() => {
 window.addEventListener("load", (event) => {
+    console.log(event);
 // *****************************************************************************
 // #region Constants and Variables
 
@@ -27,7 +28,7 @@ const CELL_COLORS = {
 const CELLS_PER_AXIS = 9;
 const CELL_WIDTH = canvas.width/CELLS_PER_AXIS;
 const CELL_HEIGHT = canvas.height/CELLS_PER_AXIS;
-const MAXIMUM_SCORE = CELLS_PER_AXIS * CELLS_PER_AXIS;
+const MAXIMUM_SCORE = CELLS_PER_AXIS * CELLS_PER_AXIS;;
 
 // Game objects
 let replacementColor = CELL_COLORS.white;
@@ -130,11 +131,9 @@ function restart() {
 
 canvas.addEventListener("mousedown", gridClickHandler);
 function gridClickHandler(event) {
-    // eslint-disable-next-line no-unused-vars
-    updatePlayerScore();
+     updatePlayerScore();
     updateGridAt(event.offsetX, event.offsetY);
 }
-
 
 restartButton.addEventListener("mousedown", restartClickHandler);
 function restartClickHandler() {
